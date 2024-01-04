@@ -35,13 +35,7 @@ sav <- sav[Include == 1 & MADup==1, ]
 
 # Functions ----
 # returns number of programs for each parameter
-program_param_plot <- function(habitat="Oyster", ret="plot"){
-  
-  if (habitat == "Oyster"){
-    data <- oyster
-  } else if (habitat == "Submerged Aquatic Vegetation"){
-    data <- sav
-  }
+program_param_plot <- function(data=oyster, ret="plot"){
   
   program_params <- data %>%
     group_by(ParameterName) %>%
@@ -62,13 +56,7 @@ program_param_plot <- function(habitat="Oyster", ret="plot"){
 }
 
 # returns number of years of data for each ProgramID
-program_years_plot <- function(habitat="Oyster", pal){
-  
-  if (habitat == "Oyster"){
-    data <- oyster
-  } else if (habitat == "Submerged Aquatic Vegetation"){
-    data <- sav
-  }
+program_years_plot <- function(data=oyster, pal){
   
   program_years <- data %>%
     group_by(ProgramID) %>%
@@ -173,6 +161,10 @@ ui <- fluidPage(
            plotOutput("program_plot")),
     column(4, 
            leafletOutput("leaflet_map"))
+  ),
+  fluidRow(
+    column(12,
+           tableOutput("output_table"))
   )
 )
 
@@ -186,11 +178,21 @@ server <- function(input, output, session){
     }
   })
   
-  output$param_plot <- renderPlot(program_param_plot(habitat=input$habitatSelect, ret="plot"))
+  data <- reactive({
+    if (input$habitatSelect == "Oyster"){
+      oyster
+    } else if(input$habitatSelect == "Submerged Aquatic Vegetation"){
+      sav
+    }
+  })
   
-  output$program_plot <- renderPlot(program_years_plot(habitat=input$habitatSelect, pal()))
+  output$param_plot <- renderPlot(program_param_plot(data=data(), ret="plot"))
+  
+  output$program_plot <- renderPlot(program_years_plot(data=data(), pal()))
   
   output$leaflet_map <- renderLeaflet(sample_map(habitat=input$habitatSelect, pal()))
+  
+  output$output_table <- renderTable(head(data()))
   
   # output$param_text <- renderText(program_param_plot(habitat=input$habitatSelect, ret="list"))
   
