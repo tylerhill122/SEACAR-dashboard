@@ -133,7 +133,7 @@ sample_map <- function(habitat="Oyster", pal){
     addLayersControl(
       overlayGroups = c("ORCP Boundaries"),
       baseGroups = c("Default", "Positron by CartoDB"),
-      options = layersControlOptions(collapsed = FALSE)) %>%
+      options = layersControlOptions(collapsed = TRUE)) %>%
     addCircleMarkers(lat=~Latitude_D, lng=~Longitude_, color=~pal(ProgramID),
                      weight=1, radius=rad, fillOpacity=0.4,
                      popup = ~popup,
@@ -154,7 +154,10 @@ ui <- fluidPage(
                          label = "Select Habitat to view",
                          choices = habitats,
                          selected = "Oyster"),
-             plotOutput("param_plot")
+             plotOutput("param_plot"),
+             selectInput(inputId = "programSelect",
+                         label = "Select Program to Preview Summary Statistics",
+                         choices = "Choose a Program")
            ),
     ),
     column(4, 
@@ -186,15 +189,32 @@ server <- function(input, output, session){
     }
   })
   
+  data_summary <- reactive({
+    if (input$habitatSelect == "Oyster"){
+      oyster[ProgramID==input$programSelect, ]
+    } else if(input$habitatSelect == "Submerged Aquatic Vegetation"){
+      sav[ProgramID==input$programSelect, ]
+    }
+  })
+  
   output$param_plot <- renderPlot(program_param_plot(data=data(), ret="plot"))
   
   output$program_plot <- renderPlot(program_years_plot(data=data(), pal()))
   
   output$leaflet_map <- renderLeaflet(sample_map(habitat=input$habitatSelect, pal()))
   
-  output$output_table <- renderTable(head(data()))
+  output$output_table <- renderTable(head(data_summary()))
   
-  # output$param_text <- renderText(program_param_plot(habitat=input$habitatSelect, ret="list"))
+  observe({
+    
+    included_programs <- as.integer(unique(data()$ProgramID))
+    
+    updateSelectInput(session = session, "programSelect", 
+                      label = "Select Program to Preview Summary Statistics", 
+                      choices = included_programs,
+                      selected = head(included_programs,1))
+    
+  })
   
 }
 
