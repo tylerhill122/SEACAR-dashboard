@@ -13,6 +13,21 @@ library(bsicons)
 library(ggplot2)
 library(plotly)
 
+plot_theme <- theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        text=element_text(family="Arial"),
+        plot.title=element_text(hjust=0.5, size=12, color="#314963"),
+        plot.subtitle=element_text(hjust=0.5, size=10, color="#314963"),
+        legend.title=element_text(size=10),
+        legend.text.align = 0,
+        axis.title.x = element_text(size=10, margin = margin(t = 5, r = 0,
+                                                             b = 10, l = 0)),
+        axis.title.y = element_text(size=10, margin = margin(t = 0, r = 10,
+                                                             b = 0, l = 0)),
+        axis.text=element_text(size=10),
+        axis.text.x=element_text(angle = -45, hjust = 0))
+
 source("load_shape_samples.R")
 source("seacar_data_location.R")
 
@@ -23,8 +38,8 @@ habitat_files <- str_subset(files, "All_")
 # file_loc function to return full filepath name
 file_loc <- function(habitat){return(paste0(seacar_data_location, str_subset(habitat_files, habitat)))}
 
-oyster <- fread(file_loc("Oyster"))
-oyster <- oyster[Include == 1 & MADup==1, ] 
+oyster <- fread(file_loc("Oyster"), encoding="Latin-1")
+oyster <- oyster[Include == 1 & MADup==1, ]
 
 sav <- fread(file_loc("SAV"))
 sav <- sav[Include == 1 & MADup==1, ] 
@@ -143,6 +158,35 @@ sample_map <- function(habitat="Oyster", pal){
   return(map %>% hideGroup(c("ORCP Boundaries")))
 }
 
+summary_table <- function(data){
+  return(
+    data %>%
+      group_by(ParameterName) %>%
+      summarise(N_samples = n(),
+                mean = round(mean(ResultValue),2),
+                min = min(ResultValue),
+                max = max(ResultValue))
+  )
+}
+
+plot_parameters <- function(data, parameter){
+  plot_data <- data %>%
+    filter(ParameterName==parameter) %>%
+    group_by(Year) %>%
+    summarise(mean=mean(ResultValue))
+  
+  plot <- ggplot(plot_data, aes(x=Year, y=mean)) +
+    geom_bar(stat = "identity", fill="#4472C4") +
+    labs(title=paste0("Mean ", parameter, " by year"),
+         x="Year",
+         y=paste0("Mean ", parameter)) +
+    scale_x_continuous(limits=c(min(plot_data$Year), max(plot_data$Year)),
+                       breaks=seq(max(plot_data$Year), min(plot_data$Year), -1)) +
+    plot_theme
+  
+  return(plot)
+}
+
 habitats <- c("Oyster","Submerged Aquatic Vegetation")
 
 ui <- fluidPage(
@@ -154,20 +198,29 @@ ui <- fluidPage(
                          label = "Select Habitat to view",
                          choices = habitats,
                          selected = "Oyster"),
-             plotOutput("param_plot"),
-             selectInput(inputId = "programSelect",
-                         label = "Select Program to Preview Summary Statistics",
-                         choices = "Choose a Program")
+             plotOutput("param_plot")
            ),
     ),
-    column(4, 
+    column(4,
            plotOutput("program_plot")),
     column(4, 
            leafletOutput("leaflet_map"))
   ),
+  titlePanel("By Program"),
   fluidRow(
-    column(12,
-           tableOutput("output_table"))
+    column(4,
+           wellPanel(
+             selectInput(inputId = "programSelect",
+                         label = "Select Program to Preview Summary Statistics",
+                         choices = "Choose a Program"),
+             tableOutput("sum_table"),
+             selectInput(inputId = "parameterSelect",
+                         label = "Select Parameter to Plot",
+                         choices = "Choose a Parameter")
+             )
+           ),
+    column(8,
+           plotOutput("parameter_plot"))
   )
 )
 
@@ -189,12 +242,8 @@ server <- function(input, output, session){
     }
   })
   
-  data_summary <- reactive({
-    if (input$habitatSelect == "Oyster"){
-      oyster[ProgramID==input$programSelect, ]
-    } else if(input$habitatSelect == "Submerged Aquatic Vegetation"){
-      sav[ProgramID==input$programSelect, ]
-    }
+  data_by_program <- reactive({
+    data()[ProgramID==input$programSelect, ]
   })
   
   output$param_plot <- renderPlot(program_param_plot(data=data(), ret="plot"))
@@ -203,19 +252,32 @@ server <- function(input, output, session){
   
   output$leaflet_map <- renderLeaflet(sample_map(habitat=input$habitatSelect, pal()))
   
-  output$output_table <- renderTable(head(data_summary()))
+  output$output_table <- renderTable(head(data_by_program()))
+  
+  output$sum_table <- renderTable(summary_table(data_by_program()))
+  
+  output$parameter_plot <- renderPlot(plot_parameters(data=data_by_program(), parameter=input$parameterSelect))
+  
+  observe({
+    included_programs <- sort(as.integer(unique(data()$ProgramID)))
+    
+    updateSelectInput(session = session, 
+                      inputId = "programSelect", 
+                      label = "Select Program to Preview Summary Statistics", 
+                      choices = included_programs)
+  })
   
   observe({
     
-    included_programs <- as.integer(unique(data()$ProgramID))
+    included_parameters <- unique(data_by_program()$ParameterName)
     
-    updateSelectInput(session = session, "programSelect", 
-                      label = "Select Program to Preview Summary Statistics", 
-                      choices = included_programs,
-                      selected = head(included_programs,1))
+    updateSelectInput(session = session, 
+                      inputId = "parameterSelect", 
+                      label = "Select Parameter to Plot", 
+                      choices = included_parameters,
+                      selected = head(included_parameters,1))
     
   })
-  
 }
 
 shinyApp(ui = ui, server = server)
