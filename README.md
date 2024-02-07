@@ -10,6 +10,10 @@ The purpose of this repository is to serve as a preliminary exploration of an al
   + Pop-up boxes contain further information for each sample site; including Parameters Measured, Years, Total amount of data collected
 * A table below provides a print-out of the first 10 entries for each habitat within the combined data tables
 
-![SAV Dashboard](images/sav_dashboard.png)
+With *Submerged Aquatic Vegetation* selected:  
+
+![SAV Dashboard](images/sav_dashboard.png)  
+
+With *Oyster* selected:  
 
 ![Oyster Dashboard](images/oyster_dashboard.png)
